@@ -5,12 +5,14 @@ require 'getoptlong'
 opts = GetoptLong.new(
   [ '--help', '-h', GetoptLong::NO_ARGUMENT ],
   [ '--limit', '-l', GetoptLong::OPTIONAL_ARGUMENT ],
-  [ '--size', '-s', GetoptLong::OPTIONAL_ARGUMENT ]
+  [ '--size', '-s', GetoptLong::OPTIONAL_ARGUMENT ],
+  [ '--threshold', '-t', GetoptLong::OPTIONAL_ARGUMENT]
 )
 
 filepath = nil
 limit = 0
 size = 1
+threshold = 0
 opts.each do |opt, arg|
   case opt
     when '--help'
@@ -27,6 +29,9 @@ usage: ruby profiler.rb [OPTION] ... FILE
 --size x, -s x:
 	size of result set (default 1)
 
+--threshold t, -t t
+	threshold of time in second to be return
+
 
 FILE: The path to the log file.
       EOF
@@ -34,12 +39,19 @@ FILE: The path to the log file.
     	limit = arg.to_i
     when '--size'
     	size = arg.to_i
+    when '--threshold'
+    	threshold = arg.to_f
   end
 end
 
 if ARGV.length < 1
   puts "Missing file argument (try --help)"
   exit 0
+end
+
+if size != 1 and threshold != 0
+	puts "--size and --threshold cannot be used in the same time"
+	exit 0
 end
 
 filepath = ARGV.shift
@@ -53,6 +65,7 @@ class NginxProfiler
 		@slowest_records = Array.new
 		@last_time = 0
 		@cnt = 0
+		@threshold = options[:threshold]
 	end
 
 	def process_file
@@ -67,7 +80,7 @@ class NginxProfiler
 			else
 				row = record.split
 				time = time_of_record record
-				if time > @last_time or @slowest_records.length < @size
+				if time > @last_time or @slowest_records.length < @size or (@threshold > 0 and time > @threshold)
 					index = position_of_record_with_time time
 					if index >= 0
 						insert_record index, record
@@ -103,11 +116,13 @@ class NginxProfiler
 
 	def insert_record (index, record)
 		@slowest_records.insert(index, record)
-		@slowest_records = @slowest_records[0..@size]
+		if @threshold == 0
+			@slowest_records = @slowest_records[0..@size]
+		end
 		@last_time = time_of_record @slowest_records.last
 	end
 end
 
-profiler = NginxProfiler.new(filepath, {:limit => limit, :size => size})
+profiler = NginxProfiler.new(filepath, {:limit => limit, :size => size, :threshold => threshold})
 profiler.process_file
 profiler.print_result
