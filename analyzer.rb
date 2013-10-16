@@ -102,7 +102,6 @@ class NginxProfiler
 	end
 
 	def insert_record (index, record)
-		puts "insert #{time_of_record record} to #{index}"
 		@slowest_records.insert(index, record)
 		@slowest_records = @slowest_records[0..@size]
 		@last_time = time_of_record @slowest_records.last
