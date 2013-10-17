@@ -76,11 +76,30 @@ class NginxProfiler
 			end
 
 			if @slowest_records.length == 0
-				insert_record @slowest_records.length, record
+				if @threshold > 0
+					time = time_of_record record
+					if time >= @threshold
+						insert_record 0, record
+					end
+				else
+					insert_record 0, record
+				end
 			else
 				row = record.split
 				time = time_of_record record
-				if time > @last_time or @slowest_records.length < @size or (@threshold > 0 and time > @threshold)
+				hit = false
+				if time > @last_time
+					if @threshold > 0
+						if time >= @threshold
+							hit = true
+						end
+					else
+						hit = true
+					end
+				elsif @slowest_records.length < @size
+					hit = true
+				end
+				if hit
 					index = position_of_record_with_time time
 					if index >= 0
 						insert_record index, record
